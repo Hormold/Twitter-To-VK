@@ -20,6 +20,7 @@ class twi2vk
 	var $time=0;
 	var $debug=Array();
 	//MAIN
+	var $check_next_if_no_replay=1;
 	var $add=" ";//." (via Twitter)";
 	var $no="#nvk";
 
@@ -33,19 +34,21 @@ class twi2vk
 		$this->o=$this->now-$this->ft; //diff
 		if($this->o>$this->cache_time){$this->time=1;}
 		$this->dbg("[/init]");
+		$this->counter=0;
 	}
 	function main()
 	{
 		$this->dbg("[main]");
 		if($this->time==1){
+			$this->load_twitter();
 			$this->twitter();
-			if(trim($this->msg)!==trim($this->fg) AND $this->error==0){
+			if(trim($this->msg)!==trim($this->fg) AND $this->error==0 AND trim($this->msg)!==""){
 				$this->vk();
 			}else{
 				$this->dbg("OLD: $this->msg");
 			}
 		}else{
-			$this->dbg("CACHE: $this->cfg[fg]");
+			$this->dbg("CACHE: ".$this->fg);
 		}
 		$this->dbg("[/main]");
 	}
@@ -62,31 +65,33 @@ class twi2vk
 		$this->dbg("UPDATE done...");
 		$this->dbg("[/vk]");
 	}
+	function load_twitter()
+	{
+		$this->tmp = $this->curl("http://api.twitter.com/1/statuses/user_timeline.xml?screen_name=".$this->user,''); 
+		$this->dbg("Loading Twitter API...");
+		preg_match_all("#<text>(.*)</text>#iU",$this->tmp,$this->msgs); 
+		preg_match_all("#<in_reply_to_screen_name>(.*)</in_reply_to_screen_name>#iU",$this->tmp,$this->rpl); 
+		$this->msgs=$this->msgs[1];
+		$this->rpl=$this->rpl[1];
+	}
 	function twitter()
 	{
+		$this->error=0;
 		$this->dbg("[twitter]");
-		if(!isset($this->tmp)){
-			$this->tmp = $this->curl("http://api.twitter.com/1/statuses/user_timeline.xml?screen_name=".$this->user,''); 
-			$this->dbg("Loading Twitter API...");
-		}else{
-			$this->dbg("Twitter API already cached...");
-		}
-		//preg_match_all("#<text>(.*)</text>#iU",$this->tmp,$msg); 
-		$this->msg=$this->expl("<text>","</text>",$this->tmp);
+		$this->msg=$this->msgs[$this->counter];
 		$this->msg=html_entity_decode($this->msg, ENT_NOQUOTES,'UTF-8');
 		$this->dbg("Twitter: $this->msg");
-		if(strpos($this->msg,$this->no)){
-			$this->dbg("Stop-word: ".$this->no.". Try next...");
-			$tmp=explode("</text>",$this->tmp);
-			$this->tmp=$tmp[1];
-			$this->twitter();
+		if(strpos($this->msg,$this->no)){$this->dbg("Stop-word: ".$this->no.". Try next...");$this->counter++;$this->twitter();}
+		$this->rp=$this->rpl[$this->counter];
+		if($this->no_rp==1 and $this->rp!==""){
+			$this->error=1;$this->dbg("ERROR: NO @!");
+			if($this->check_next_if_no_replay==1){
+				$this->counter++;
+				$this->twitter();
+			}
 		}
-		
 		$this->rt=$this->expl("<retweeted>","</retweeted>",$this->tmp);
-		//
-		$this->rp=$this->expl("<in_reply_to_screen_name>","</in_reply_to_screen_name>",$this->tmp);
 		if($this->no_rt==1 and $this->rt!=="false"){$this->error=1;$this->dbg("ERROR: NO RT!");}
-		if($this->no_rp==1 and $this->rp!==""){$this->error=1;$this->dbg("ERROR: NO @!");}
 		$this->dbg("[/twitter]");
 	}
 	
@@ -111,7 +116,6 @@ class twi2vk
 		curl_setopt($ch, CURLOPT_URL, $url); 
 		curl_setopt($ch, CURLOPT_HEADER, 0); 
 		curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US, PHP) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.6 Safari/534.16");
-		
 		curl_setopt($ch, CURLOPT_COOKIEJAR, $cfile); 
 		curl_setopt($ch, CURLOPT_COOKIEFILE, $cfile); 
 		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
