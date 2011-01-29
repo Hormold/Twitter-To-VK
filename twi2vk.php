@@ -61,7 +61,7 @@ class twi2vk
 		$this->tmp=$a["msg"].$add;
 		$login=$this->login();
 		$this->dbg("Login done...");
-		$this->tmp=$this->curl("http://vkontakte.ru/al_wall.php","act=post&al=1&hash=".$login."&message=".$this->msg."&note_title=&official=&status_export=0&to_id=5385365&type=all");
+		$this->tmp=$this->curl("http://vkontakte.ru/al_wall.php","act=post&al=1&hash=".$login."&message=".$this->msg."&note_title=&official=&status_export=0&to_id=".$this->id."&type=all");
 		$this->dbg("UPDATE done...");
 		$this->dbg("[/vk]");
 	}
