@@ -1,4 +1,5 @@
 <?
+//Beta 0.3
 $n=new twi2vk;
 $n->init();							  //INIT
 $n->svar("user","");				  //TWITTER LOGIN
@@ -10,19 +11,24 @@ echo($n->shwdbg());
 
 class twi2vk
 {
+	//MAIN
+	var $check_next_if_no_replay=1; 
+	var $twitter_name_to_link=1; //"@test" to "@test (http://twitter.com/test)"
+	var $request_twitter_fullname=1; //"@test" to "Hellow World (http://twitter.com/test)" 
+	var $add=" ";//." (via Twitter)";
+	var $no="#nvk";
+	//END MAIN
 	var $cfg=Array();
 	var $is_debug=1;
-	var $cache_time=10;
+	var $cache_time=1;
 	var $file="last.txt";
 	var $no_rt=0;
 	var $no_rp=1;
 	var $error=0;
 	var $time=0;
 	var $debug=Array();
-	//MAIN
-	var $check_next_if_no_replay=1;
-	var $add=" ";//." (via Twitter)";
-	var $no="#nvk";
+	var $tmp,$tmp2,$tmp3,$twiname;
+	
 
 	function init()
 	{
@@ -58,6 +64,14 @@ class twi2vk
 		file_put_contents($this->file,$this->msg);
 		$this->dbg("Save last message to ".$this->file);
 		$this->dbg("NEW STATUS: ".$this->msg);
+		if($this->request_twitter_fullname==1){
+			$this->linkify_tweet_2();
+			$this->get_twitter_name($this->tmp2);
+			$this->linkify_tweet_2();
+		}
+		if($this->twitter_name_to_link==1 AND $this->request_twitter_fullname==0){
+			$this->linkify_tweet();
+		}
 		$this->tmp=$this->msg.$this->add;
 		$login=$this->login();
 		$this->dbg("Login done...");
@@ -65,6 +79,7 @@ class twi2vk
 		$this->dbg("UPDATE done...");
 		$this->dbg("[/vk]");
 	}
+
 	function load_twitter()
 	{
 		$this->tmp = $this->curl("http://api.twitter.com/1/statuses/user_timeline.xml?screen_name=".$this->user,''); 
@@ -74,6 +89,17 @@ class twi2vk
 		$this->msgs=$this->msgs[1];
 		$this->rpl=$this->rpl[1];
 	}
+	
+	function get_twitter_name($name)
+	{
+		$this->tmp3 = $this->curl("http://api.twitter.com/1/users/show.xml?screen_name=".$name,''); 
+		$this->dbg("Loading Twitter API (2)...");
+		preg_match_all("#<name>(.*)</name>#iU",$this->tmp3,$this->twiname); 
+		$this->twiname=$this->twiname[1][0];
+		$this->twiname=html_entity_decode($this->twiname, ENT_NOQUOTES,'UTF-8');
+		$this->dbg("NAME: ".$this->twiname);
+	}
+
 	function twitter()
 	{
 		$this->error=0;
@@ -107,6 +133,8 @@ class twi2vk
 		$this->dbg("[/login]");
 		return ($regs[1][0]);
 	}
+
+
 	function curl($url,$post) 
 	{ 
 		$this->dbg("[curl]");
@@ -150,6 +178,25 @@ class twi2vk
 		$this->dbg("[set_var] $var:$value [/set_var]");
 		$this->$var=$value;
 	}
+
+	function linkify_tweet() {
+		$this->msg = preg_replace('/(^|\s)@(\w+)/','\1@\2 (http://twitter.com/\2)',$this->msg);
+		$this->msg = preg_replace('/(^|\s)#(\w+)/','\1#\2 (http://search.twitter.com/search?q=%23\2)',$this->msg);
+	}
+
+	function linkify_tweet_2() {
+		if(!$this->tmp2){
+			$this->dbg("[lt2]Start LT2[/lt2]");
+			preg_match_all("/@([A-Za-z0-9_]+)/i",$this->msg,$regs); 
+			$this->tmp2 = $regs[1][0];
+			$this->dbg("[lt2]GET:".$this->tmp2."[/lt2]");
+		}else{
+			$this->dbg("[lt2]Start LT2 (2)[/lt2]");
+			$this->msg  = str_replace("@".$this->tmp2,$this->twiname." (http://twitter.com/".$this->tmp2.")",$this->msg);
+		}
+		
+	}
+
 	function expl($f,$t,$text)
 	{
 		//$this->dbg("[expl] FROM $f to $t. [/expl]");
